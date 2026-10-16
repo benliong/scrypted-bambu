@@ -8,6 +8,7 @@ export class FrameFeed {
   private readonly clients = new Set<ServerResponse>();
   private readonly onClientCount: (count: number) => void;
   private latest?: Buffer;
+  private pacer?: NodeJS.Timeout;
 
   constructor(onClientCount: (count: number) => void) {
     this.onClientCount = onClientCount;
@@ -39,10 +40,14 @@ export class FrameFeed {
 
   push(frame: Buffer) {
     this.latest = frame;
-    for (const client of this.clients) {
-      // a stalled reader misses frames rather than buffering them
-      if (!client.writableNeedDrain) this.write(client, frame);
-    }
+    // resend the newest frame every 100 ms so ffmpeg gets a steady 10 fps input
+    this.pacer ??= setInterval(() => {
+      if (!this.clients.size || !this.latest) return;
+      for (const client of this.clients) {
+        // a stalled reader misses frames rather than buffering them
+        if (!client.writableNeedDrain) this.write(client, this.latest);
+      }
+    }, 100);
   }
 
   private write(response: ServerResponse, frame: Buffer) {
@@ -54,6 +59,8 @@ export class FrameFeed {
   }
 
   close() {
+    clearInterval(this.pacer);
+    this.pacer = undefined;
     for (const client of this.clients) client.destroy();
     this.server.close();
   }

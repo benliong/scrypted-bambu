@@ -11,6 +11,9 @@ export const DEFAULT_ENCODER_ARGUMENTS = `-vf ${WALL_CLOCK_FILTER} -c:v libx264 
 
 // frame pacing feeds ffmpeg at the same 10 fps the encoder outputs
 export const FRAME_PACING_MS = 100;
+// pacing stops once the printer has been silent this long, so a dead printer stalls
+// ffmpeg and the stream ends instead of freezing on the last frame
+export const STALE_FRAME_MS = 5000;
 
 export const splitArguments = (value: string): string[] => {
   return value.split(" ").filter((arg) => arg);

@@ -8,14 +8,18 @@ export class FrameFeed {
   private readonly clients = new Set<ServerResponse>();
   private readonly onClientCount: (count: number) => void;
   private readonly paceMs: number;
+  private readonly staleMs: number;
   private latest?: Buffer;
+  private latestAt = 0;
   private pacer?: NodeJS.Timeout;
 
   // paceMs > 0 resends the newest frame on that interval while anyone is reading,
-  // 0 forwards each frame once as it arrives
-  constructor(onClientCount: (count: number) => void, paceMs = 0) {
+  // 0 forwards each frame once as it arrives. resends stop once the newest frame is
+  // staleMs old, so a source that went quiet stalls readers instead of freezing them
+  constructor(onClientCount: (count: number) => void, paceMs = 0, staleMs = Infinity) {
     this.onClientCount = onClientCount;
     this.paceMs = paceMs;
+    this.staleMs = staleMs;
     this.server = createServer((_, response) => {
       response.writeHead(200, {
         "Content-Type": `multipart/x-mixed-replace; boundary=${BOUNDARY}`,
@@ -46,6 +50,7 @@ export class FrameFeed {
 
   push(frame: Buffer) {
     this.latest = frame;
+    this.latestAt = Date.now();
     // the pacer picks it up on its next tick
     if (!this.pacer) this.broadcast(frame);
   }
@@ -56,7 +61,7 @@ export class FrameFeed {
   private startPacing() {
     if (!this.paceMs || this.pacer) return;
     this.pacer = setInterval(() => {
-      if (this.latest) this.broadcast(this.latest);
+      if (this.latest && Date.now() - this.latestAt < this.staleMs) this.broadcast(this.latest);
     }, this.paceMs);
   }
 

@@ -28,7 +28,8 @@ import {
   chamberInputArguments,
   DEFAULT_ENCODER_ARGUMENTS,
   FRAME_PACING_MS,
-  splitArguments
+  splitArguments,
+  STALE_FRAME_MS
 } from "./pipeline.ts";
 
 const { deviceManager, mediaManager } = sdk;
@@ -112,7 +113,8 @@ class ChamberSource implements CameraSource {
         this.feedClients = count;
         this.scheduleIdle();
       },
-      printer.storageSettings.values.framePacing ? FRAME_PACING_MS : 0
+      printer.storageSettings.values.framePacing ? FRAME_PACING_MS : 0,
+      STALE_FRAME_MS
     );
     this.client.on("frame", (frame) => this.feed.push(frame));
   }

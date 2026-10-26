@@ -45,3 +45,17 @@ test("pacing stops when the last reader leaves", async () => {
   assert.equal((feed as unknown as { pacer?: NodeJS.Timeout }).pacer, undefined);
   feed.close();
 });
+
+test("pacing stops once the latest frame is stale", async () => {
+  const feed = new FrameFeed(() => {}, 20, 100);
+  const response = await connect(feed);
+  let body = "";
+  response.on("data", (chunk: Buffer) => (body += chunk.toString("latin1")));
+  const parts = () => body.split("--frame\r\n").length - 1;
+  await sleep(150);
+  const whileFresh = parts();
+  await sleep(150);
+  feed.close();
+  assert.ok(whileFresh >= 3, `got ${whileFresh} parts while the frame was fresh`);
+  assert.equal(parts(), whileFresh);
+});
